@@ -8900,7 +8900,14 @@ renderExamCountdown(); setHH();
   setInterval(()=>{ if(!document.hidden)syncNow(false); },180000);
   setInterval(renderExamCountdown,3600000);
 })();
-if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
+const EKYS_SURUM='202610181113';
+if('serviceWorker' in navigator){ const ilkKontrol=!!navigator.serviceWorker.controller; let yenilendi=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(!ilkKontrol||yenilendi) return; yenilendi=true; location.reload(); });
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(reg=>{ reg.update().catch(()=>{}); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) reg.update().catch(()=>{}); }); }).catch(()=>{})); }
+window.ekysZorlaGuncelle=async function(){ try{ if('serviceWorker' in navigator){ const rs=await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(r=>r.unregister())); } if(window.caches){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); } }catch(e){} location.replace(location.pathname+'?v='+Date.now()); };
+(function(){ const ci=document.getElementById('codeIn'); if(!ci) return; const kart=ci.closest('.card')||ci.parentElement; const d=document.createElement('div'); d.className='card';
+  d.innerHTML='<div class="subj-top"><span class="n">📦 Uygulama sürümü</span><b>'+EKYS_SURUM+'</b></div><div class="tip">Yeni içerik görünmüyorsa internete bağlıyken bu düğmeye bas. İlerlemen silinmez.</div><button type="button" id="zorlaBtn" style="width:100%;margin-top:8px;padding:11px;border:0;border-radius:10px;background:#0f766e;color:#fff;font-weight:800;font-size:14px">🔄 Güncellemeyi zorla</button>';
+  kart.after(d); const b=d.querySelector('#zorlaBtn'); b.addEventListener('click',()=>{ b.textContent='Güncelleniyor…'; window.ekysZorlaGuncelle(); }); })();
 </script>
 </body>
 </html>
