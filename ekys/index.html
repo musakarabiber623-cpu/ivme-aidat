@@ -4838,6 +4838,32 @@ const ST_TXTCOL=["#64748b","#fff","#fff","#fff"];
 
 let data = load();
 
+/* Eski sıra numaralı işaretleri ("eys_motiv_3") başlık anahtarına taşır. İçeriği değişen konular için eski düzen → yeni bölüm(ler).
+   Değişmeyen konularda numara aynı bölümü gösterir. Taşınan eski anahtar silinir; iş idempotenttir (her yüklemede güvenle çalışır). */
+function lessonGecis(){ return {
+  // eys_surec: 6 bölümlük eski düzen ile 18 Eki öğlen yayımlanan 14 bölümlük düzen. 6'dan büyük numara varsa 14'lük düzendir.
+  eys_surec: { eski6:[[0],[1,2,3],[4],[6,7],[12],[17]], ara14:[[0],[1],[2],[3],[4],[5],[6],[7],[8],[9],[10],[11],[12],[17]] },
+  eys_motiv: [[0],[1],[2],[6],["eys_iky:2"],[7]],   // eski: neden-Maslow-Herzberg-XY-İKY-tuzak
+  eys_lider: [[0],[0],[2],[3],[4,5],[6]],           // eski: yönetici/lider-kuramlar-iletişim-çatışma-stres/değişim-kültür
+  eys_kriz:  [[2],[3],[3],[4],[4],[0]]              // eski: kriz nedir-3 aşama-plan/ekip-senaryolar-iletişim/destek-güvenli iklim
+}; }
+function migrateLessons(d){
+  if(!d||!d.lesson) return d;
+  const L=d.lesson, eski=Object.keys(L).filter(k=>/^(.+)_([0-9]+)$/.test(k) && k.indexOf("§")<0);
+  if(!eski.length) return d;
+  const surecMax=Math.max(-1,...eski.filter(k=>/^eys_surec_[0-9]+$/.test(k)).map(k=>+k.split("_").pop()));
+  eski.forEach(k=>{
+    const m=k.match(/^(.+)_([0-9]+)$/), zid=m[1], i=+m[2];
+    if(!ZIHIN[zid]||!ZIHIN[zid].ogren) return;               // tanınmayan anahtar: dokunma
+    let hedef=[[zid,i]];
+    const g=lessonGecis()[zid];
+    if(g){ const plan=Array.isArray(g)?g:(surecMax>=6?g.ara14:g.eski6); const t=plan[i];
+      hedef = t ? t.map(x=>typeof x==="string"?[x.split(":")[0],+x.split(":")[1]]:[zid,x]) : []; }
+    hedef.forEach(([z,j])=>{ if(ZIHIN[z]&&ZIHIN[z].ogren&&ZIHIN[z].ogren[j]) L[lessonKey(z,j)]=1; });
+    delete L[k];
+  });
+  return d;
+}
 function load(){
   let d = {};
   try{ d = JSON.parse(localStorage.getItem(KEY)) || {}; }catch(e){ d={}; }
@@ -4849,7 +4875,7 @@ function load(){
   d.dayCount = d.dayCount || 0;
   d.dayCountDate = d.dayCountDate || null;
   d.denemeGecmisi = d.denemeGecmisi || [];
-  return d;
+  return migrateLessons(d);
 }
 function save(){ data._updated=Date.now(); data._dev=DEVNAME; localStorage.setItem(KEY, JSON.stringify(data)); scheduleSync(); }
 function saveRaw(){ localStorage.setItem(KEY, JSON.stringify(data)); }
@@ -5153,7 +5179,7 @@ function renderKonu(){
   // öğren: bölüm tamamla / geri al
   body.querySelectorAll(".lbtn").forEach(b=>b.addEventListener("click",e=>{
     e.stopPropagation();
-    const z=b.dataset.z, i=+b.dataset.i, key=z+"_"+i;
+    const z=b.dataset.z, i=+b.dataset.i, key=lessonKey(z,i);
     const wasDone=!!data.lesson[key];
     if(wasDone) delete data.lesson[key]; else { data.lesson[key]=1; bumpDay(); updateStreak(); }
     save();
@@ -8976,7 +9002,11 @@ function finishTest(zid, area){
   bumpDay(); updateStreak(); save();
   sc.scrollIntoView({behavior:"smooth",block:"center"});
 }
-function lessonDone(zid,i){ return !!data.lesson[zid+"_"+i]; }
+/* "Tamamladım" işareti bölüm SIRASINA değil BAŞLIĞINA bağlıdır (18 Eki 2026): bölüm eklenip çıkarılsa da işaret kaymaz.
+   Anahtar: zid + "§" + başlık özü. Başlık değiştirilecekse LESSON_ESKI_BASLIK'a eski→yeni eklenir. */
+function lessonSlug(h){ return String(h||"").toLocaleLowerCase("tr").replace(/[^a-z0-9çğıöşüâîû]+/g,"-").replace(/^-+|-+$/g,""); }
+function lessonKey(zid,i){ const o=ZIHIN[zid]&&ZIHIN[zid].ogren&&ZIHIN[zid].ogren[i]; return zid+"§"+(o?lessonSlug(o.h):("#"+i)); }
+function lessonDone(zid,i){ return !!data.lesson[lessonKey(zid,i)]; }
 function lessonStats(zid,total){ let d=0; for(let i=0;i<total;i++) if(lessonDone(zid,i)) d++; return d; }
 
 function lessonHTML(og, zid){
@@ -9393,7 +9423,7 @@ function mergeData(a,b){
   out.testBest={}; const TA=a.testBest||{}, TB=b.testBest||{};
   new Set([...Object.keys(TA),...Object.keys(TB)]).forEach(k=>{ out.testBest[k]=Math.max(TA[k]||0,TB[k]||0); });
   out._updated=Math.max(au,bu); out._dev=newer._dev||older._dev||"";
-  return out;
+  return migrateLessons(out);
 }
 function scheduleSync(){ if(!syncReady())return; clearTimeout(_syncTimer); _syncTimer=setTimeout(()=>syncNow(false),4000); }
 function afterSyncRefresh(){
@@ -9483,7 +9513,7 @@ renderExamCountdown(); setHH();
   setInterval(()=>{ if(!document.hidden)syncNow(false); },180000);
   setInterval(renderExamCountdown,3600000);
 })();
-const EKYS_SURUM='202610181734';
+const EKYS_SURUM='202610181753';
 if('serviceWorker' in navigator){ const ilkKontrol=!!navigator.serviceWorker.controller; let yenilendi=false;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(!ilkKontrol||yenilendi) return; yenilendi=true; location.reload(); });
   window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(reg=>{ reg.update().catch(()=>{}); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) reg.update().catch(()=>{}); }); }).catch(()=>{})); }
