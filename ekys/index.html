@@ -4827,7 +4827,7 @@ const ZIHIN = {
 
 const KEY="ekys_v1";
 const DEV_KEY="ekys_dev", CODE_KEY="ekys_code";
-const SB_URL="https://ilhjxomsfokgczqqxerr.supabase.co", SB_KEY="sb_publishable_YPrIh-OKcp6IiIn_VDXI6A_nDeM7peK";
+const SB_URL="https://orttpdfqezsmbpkfnkkb.supabase.co", SB_KEY="sb_publishable_f7SYLGcBRFypcFXWD00DsA_4nGTIolq";
 function guessDev(){ const ua=navigator.userAgent||""; if(/iPad/.test(ua))return "iPad"; if(/iPhone/.test(ua))return "iPhone"; if(/Macintosh/.test(ua)&&(navigator.maxTouchPoints||0)>1)return "iPad"; if(/Android/.test(ua))return "Android"; if(/Windows/.test(ua))return "PC"; if(/Mac/.test(ua))return "Mac"; return "Cihaz"; }
 let DEVNAME = localStorage.getItem(DEV_KEY) || guessDev();
 function syncCode(){ return (localStorage.getItem(CODE_KEY)||"").trim(); }
@@ -9436,17 +9436,18 @@ async function syncNow(showMsg){
   const st=document.getElementById("syncStat"), code=syncCode();
   if(!SB_URL||SB_URL.indexOf("__")===0){ if(st)st.innerHTML='<span style="color:#dc2626">Supabase ayarı eksik</span>'; return; }
   if(!code){ if(st)st.innerHTML='<span style="color:var(--muted)">Senkron kodu girilmedi</span>'; if(showMsg)alert("Önce Ayarlar bölümünde bir senkron kodu gir.\nTüm cihazlarda AYNI olmalı.\nÖrn: musa-ekys-2026"); return; }
+  if(code.length<6){ if(st)st.innerHTML='<span style="color:#dc2626">Senkron kodu en az 6 karakter olmalı</span>'; if(showMsg)alert("Senkron kodu en az 6 karakter olmalı.\nÖrn: musa-ekys-2026"); return; }
   if(_syncing)return; _syncing=true;
   if(st)st.innerHTML='<span style="color:var(--muted)">Senkronlanıyor…</span>';
   const H={ "apikey":SB_KEY, "Authorization":"Bearer "+SB_KEY, "Content-Type":"application/json" };
   try{
     const c1=new AbortController(), t1=setTimeout(()=>c1.abort(),8000);
-    const gr=await fetch(SB_URL+"/rest/v1/ekys_sync?code=eq."+encodeURIComponent(code)+"&select=data",{headers:H,signal:c1.signal});
+    const gr=await fetch(SB_URL+"/rest/v1/rpc/ekys_sync_get",{method:"POST",headers:H,body:JSON.stringify({p_code:code}),signal:c1.signal});
     clearTimeout(t1); if(!gr.ok)throw new Error("okuma "+gr.status);
-    const rows=await gr.json(); const remote=(rows&&rows[0]&&rows[0].data)||{};
+    const remote=(await gr.json())||{};
     const merged=mergeData(data,remote); data=merged; saveRaw();
     const c2=new AbortController(), t2=setTimeout(()=>c2.abort(),8000);
-    const pr=await fetch(SB_URL+"/rest/v1/ekys_sync",{method:"POST",headers:Object.assign({},H,{"Prefer":"resolution=merge-duplicates,return=minimal"}),body:JSON.stringify([{code:code,data:merged,updated_at:new Date().toISOString()}]),signal:c2.signal});
+    const pr=await fetch(SB_URL+"/rest/v1/rpc/ekys_sync_put",{method:"POST",headers:H,body:JSON.stringify({p_code:code,p_data:merged}),signal:c2.signal});
     clearTimeout(t2); if(!pr.ok)throw new Error("yazma "+pr.status);
     const tt=new Date().toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"});
     if(st)st.innerHTML='<span style="color:#16a34a;font-weight:600">✓ Senkron • '+tt+'</span>';
@@ -9513,7 +9514,7 @@ renderExamCountdown(); setHH();
   setInterval(()=>{ if(!document.hidden)syncNow(false); },180000);
   setInterval(renderExamCountdown,3600000);
 })();
-const EKYS_SURUM='202610181753';
+const EKYS_SURUM='202610181807';
 if('serviceWorker' in navigator){ const ilkKontrol=!!navigator.serviceWorker.controller; let yenilendi=false;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(!ilkKontrol||yenilendi) return; yenilendi=true; location.reload(); });
   window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(reg=>{ reg.update().catch(()=>{}); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) reg.update().catch(()=>{}); }); }).catch(()=>{})); }
